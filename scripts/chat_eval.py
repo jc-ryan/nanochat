@@ -38,6 +38,7 @@ def run_generative_eval(task_object, tokenizer, model, engine, num_samples, max_
 
     # Run the evaluation
     num_passed, total = 0, 0
+    num_correct_samples, num_total_samples = 0, 0   # NEW: for avg@N
     for i in range(ddp_rank, num_problems, ddp_world_size):
         conversation = task_object[i]
 
@@ -58,9 +59,15 @@ def run_generative_eval(task_object, tokenizer, model, engine, num_samples, max_
         outcomes = [task_object.evaluate(conversation, completion) for completion in completions]
         passed = any(outcomes)
 
+        # NEW: avg@N stats
+        num_correct = sum(int(x) for x in outcomes)
+        num_correct_samples += num_correct
+        num_total_samples += len(outcomes)
+
         # Keep stats
         total += 1
         num_passed += int(passed)
+
 
         # Logging (overwrite the same line in the console)
         print(f"\r\033[KRank {ddp_rank} | {num_passed}/{total} ({100*num_passed/total:.2f}%)", end='', flush=True)
@@ -77,11 +84,24 @@ def run_generative_eval(task_object, tokenizer, model, engine, num_samples, max_
         num_passed = num_passed_tensor.item()
         total = total_tensor.item()
 
-    print0("=" * 50)
-    print0(f"Final: {num_passed}/{total} ({100*num_passed/total:.2f}%)")
+        # NEW: reduce avg@N stats
+        num_correct_samples_tensor = torch.tensor([num_correct_samples], dtype=torch.long, device=device)
+        num_total_samples_tensor = torch.tensor([num_total_samples], dtype=torch.long, device=device)
+        dist.all_reduce(num_correct_samples_tensor, op=dist.ReduceOp.SUM)
+        dist.all_reduce(num_total_samples_tensor, op=dist.ReduceOp.SUM)
+        num_correct_samples = num_correct_samples_tensor.item()
+        num_total_samples = num_total_samples_tensor.item()
 
-    # Return the accuracy
-    return num_passed/total
+
+    pass_acc = num_passed / total
+    avg_acc = num_correct_samples / max(1, num_total_samples)
+
+    print0("=" * 50)
+    print0(f"Final pass@{num_samples}: {num_passed}/{total} ({100*pass_acc:.2f}%)")
+    print0(f"Final avg@{num_samples}: {num_correct_samples}/{num_total_samples} ({100*avg_acc:.2f}%)")
+
+    return pass_acc
+
 
 # -----------------------------------------------------------------------------
 # Categorical evaluation loop
