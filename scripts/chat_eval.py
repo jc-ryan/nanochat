@@ -168,7 +168,7 @@ def run_chat_eval(task_name, model, tokenizer, engine,
         'ARC-Challenge': partial(ARC, subset="ARC-Challenge", split="test"),
         'GSM8K': partial(GSM8K, subset="main", split="test"),
         'SpellingBee': partial(SpellingBee, size=256, split="test"),
-        'AIME-2024': partial(AIME, data_path="data/aime2024.jsonl", split="test"),
+        'AIME-2024': partial(AIME, data_path="data/aime2024.jsonl")
     }[task_name]
     task_object = task_module()
     # Run the evaluation

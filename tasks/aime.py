@@ -172,13 +172,13 @@ class AIME(Task):
         conversation = {
             "messages": [
                 {"role": "user", "content": user_prompt},
+                {"role": "assistant", "content": ""},  # IMPORTANT: required by tokenizer
             ],
-            "answer": answer,
+            "answer": answer,  # gold, not in messages
             "id": ex.get("id", None),
             "url": ex.get("url", None),
         }
         return conversation
-
 
     def evaluate(self, conversation, assistant_response: str):
         # gold
